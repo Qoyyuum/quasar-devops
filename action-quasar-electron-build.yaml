@@ -1,0 +1,53 @@
+name: Quasar Electron Build and Release
+
+on:
+  push:
+    branches: [ master, dev ]
+  pull_request:
+    branches: [ master, dev ]
+
+jobs:
+  build-capacitor:
+    runs-on: ${{ matrix.os-versions }}
+    
+    defaults:
+      run:
+        shell: bash
+
+    strategy:
+      matrix:
+        os-versions: [windows-latest, macos-latest, ubuntu-latest]
+        node-versions: [10.x, 12.x, 14.x]
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup NodeJS Environment ${{ matrix.node-versions }}
+        uses: actions/setup-node@v1.4.2
+        with:
+            node-version: ${{ matrix.node-version }}
+      - run: yarn install && yarn global add @quasar/cli
+      - run: quasar build -m electron -P always
+      - run: zip -r  ./electron-${{ github.run_number }}.zip ./dist/electron/* 
+    
+      - name: Create a Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.run_number }}
+          release_name: Release ${{ github.run_number }}
+          body: Automated Electron Deployment
+          draft: false
+          prerelease: false
+          
+      - name: Upload a Release Asset
+        id: upload_release_asset
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./electron-${{ github.run_number }}.zip
+          asset_name: electron-${{ github.run_number }}.zip
+          asset_content_type: appliction/zip
